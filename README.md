@@ -20,18 +20,19 @@ Stanford Synchrotron Radiation Lightsource (SSRL)
  
    NOTE: beamline, directory, file, counter, [run numbers] are mandatory in exactly this order!!
  
-   options: - for beam lines 7-3 and 9-3 only: 'scans', [scan numbers]: Includes the given scans for that run.  \
-                                               'exclude', [channel numbers]: Channels that are excluded.  \
-                                               'spec': Create a spec file from all the data files.  \
-            - 'save', [0,1]:  The 0 or 1 argument is optional  \
-            - 'calib', [calib_file]:  Only for XES. If no calib_file is given, a filename of xes_calib is assumed \
-            - 'pre-edge':  Only for XAS and pump-probe. Here, only the pre-edge back ground fitting is done, but not the post edge normalization. \
-            - 'xes_fit': Only XES. It fits the spectrum with two reference spectra. Not functioning at the moment. \
-            - '2D': Only for pum-probe. It indicates that 2D map (time vs energy (XAS or XES)) is done. \
-            - 'norm': Only for pum-probe. The full background and normalization process is done on the on and off signals. \
-            - 't0', value: Only for pum-probe. Value of the delay where t0 was found.
- 
- 
+   -- Options:
+   - for beam lines 7-3 and 9-3 only:
+      - 'scans', [scan numbers]: Includes the given scans for that run.
+      - 'exclude', [channel numbers]: Channels that are excluded.
+      - 'spec': Create a spec file from all the data files.
+   - 'save', [0,1]:  The 0 or 1 argument is optional.
+   - 'calib', [calib_file]:  Only for XES. If no calib_file is given, a filename of xes_calib is assumed.
+   - 'pre-edge':  Only for XAS and pump-probe. Here, only the pre-edge back ground fitting is done, but not the post edge normalization.
+   - 'xes_fit': Only XES. It fits the spectrum with two reference spectra. Not functioning at the moment.
+   - '2D': Only for pum-probe. It indicates that 2D map (time vs energy (XAS or XES)) is done.
+   - 'norm': Only for pum-probe. The full background and normalization process is done on the on and off signals.
+   - 't0', value: Only for pum-probe. Value of the delay where t0 was found.
+       
 -- General description:
    - xas: If no other argument is given besides the folder, filename, detector and runs, the spectrum is processed without an incident energy calibration, but including a background correction and edge jump normalization. This can be changed to only background correction using the keyword 'pre-edge'
    - xes: If no other argument is given besides the folder, filename, detector and runs, the spectrum is processed without an emission energy calibration. I am working on an easy fit with reference spectra, but not done yet.
