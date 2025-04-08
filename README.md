@@ -8,7 +8,7 @@ Stanford Synchrotron Radiation Lightsource (SSRL)
 ### ===== Version 1.0 =====
 2025-04-07
 
--- Input syntax:
+#### -- Input syntax: **
    Beam line 15-2: \
      xas(beamline, directory, file, counter, [run numbers], options) \
       example: \
@@ -18,7 +18,7 @@ Stanford Synchrotron Radiation Lightsource (SSRL)
       example: \
      xas('7-3', '2025-01_User', 'filename', 'vortDT', [1:5])
  
-   NOTE: beamline, directory, file, counter, [run numbers] are mandatory in exactly this order!!
+   **NOTE: beamline, directory, file, counter, [run numbers] are mandatory in exactly this order!!**
  
    -- Options:
    - for beam lines 7-3 and 9-3 only:
@@ -33,7 +33,7 @@ Stanford Synchrotron Radiation Lightsource (SSRL)
    - 'norm': Only for pum-probe. The full background and normalization process is done on the on and off signals.
    - 't0', value: Only for pum-probe. Value of the delay where t0 was found.
        
--- General description:
+#### -- General description:
    - xas: If no other argument is given besides the folder, filename, detector and runs, the spectrum is processed without an incident energy calibration, but including a background correction and edge jump normalization. This can be changed to only background correction using the keyword 'pre-edge'
    - xes: If no other argument is given besides the folder, filename, detector and runs, the spectrum is processed without an emission energy calibration. I am working on an easy fit with reference spectra, but not done yet.
    - pump_probe: If no other argument is given besides the folder, filename and runs, the spectrum is processed without an indident energy calibration, no background or edge-jump processing, and no t0 shift. If these are desired, the keywords 'pre-edge', 'norm', or 't0' are required. 'norm' is not yet included and also 'pre-edge' needs be be included. Note that the background is determined from the average of laser on and off shots so that the same background is subtracted from both so that the difference after background subtraction remains meaningfull. The same is true for the edge-jump normalization.
