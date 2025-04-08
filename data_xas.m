@@ -1,0 +1,405 @@
+classdef data_xas
+    % define the keyword options:
+    properties (Constant)
+    end
+
+    % local fundtions here:
+    methods (Static)
+
+        % ---- XAS subtract background ------------------------------------
+        function [spectrum_bkg, bkg, error] = do_background(norm, mono_ref, spectrum_ph, run_str, scan_str, arg)
+
+            error = 1;
+            spectrum_bkg = spectrum_ph;
+            bkg = spectrum_ph ./ 0;
+
+            % plot spectrum_ph (the spectrum with number of photons on the y-axis):
+            figure()
+            plot(mono_ref, spectrum_ph)
+            hold on
+            if any(strcmp(arg.beamline,arg.XAS_BLs))
+                title({['file: ' arg.file], ['runs: ' run_str ', scans: ' scan_str]}, 'Interpreter','none')
+            else
+                title({['file: ' arg.file], ['runs: ' run_str]}, 'Interpreter','none')
+            end
+
+            % check if a proper background normalization is given, if
+            % not, abort the normalization
+
+            if norm.bkg_treshold_energy.value > 0
+                [~, point_end] = min(abs(mono_ref-norm.bkg_treshold_energy.value));
+                if norm.bkg_delta_energy == 0
+                    point_start = 1;
+                else
+                    [~, point_start] = min(abs(mono_ref-(norm.bkg_treshold_energy.value-abs(norm.bkg_delta_energy))));
+                end
+            else
+                disp(' ')
+                disp('   !!! No proper background energy is given. Abort the normalization.')
+                disp(' ')
+                return
+            end
+
+            % ---- XAS background subtraction -----------------------------
+            % (i) create equal distant background:
+            bkg_ref_X = mono_ref(point_start):0.1:mono_ref(point_end);
+            bkg_ref_Y = interp1(mono_ref, spectrum_ph, bkg_ref_X);
+            % (ii) fit the background curve using a linear fit
+            if norm.bkg_constant == true
+                fit_bkg = polyfit(bkg_ref_X, bkg_ref_Y, 0);
+            else
+                fit_bkg = polyfit(bkg_ref_X, bkg_ref_Y, 1);
+            end
+            bkg = polyval(fit_bkg,mono_ref);
+            spectrum_bkg = spectrum_ph - bkg;
+            
+            % add the backggroundd to the figure:
+            plot(mono_ref, bkg, "green")
+            scatter(mono_ref(point_start), bkg(point_start), 'green', 'filled')
+            scatter(mono_ref(point_end), bkg(point_end), 'green', 'filled')
+
+            error = 0;
+        end
+
+
+
+        % ---- normalize the spectrum -------------------------------------
+        function [spectrum_norm, error] = do_normalization(norm, mono_ref, spectrum_ph, spectrum_bkg, bkg)
+
+            error = 1;
+
+            % ---- edge-jump normalization ----
+            if norm.edge_jump_start.value > 0
+                start_energy = norm.edge_jump_start.value;
+                [~, start_point] = min(abs(mono_ref-norm.edge_jump_start.value));
+                if norm.edge_jump_delta_energy == 0
+                    end_energy = mono_ref(end);
+                    end_point = max(size(mono_ref));
+                else
+                    [~, end_point] = min(abs(mono_ref-(norm.edge_jump_start.value+norm.edge_jump_delta_energy)));
+                    end_energy = mono_ref(end_point);
+                end
+                % fit the edge jump
+                % make sure that the small stepsize for the glitch does not affect the
+                % fit. For that, use a constant stepsize for x
+                xx = start_energy:0.2:end_energy;
+                yy = interp1(mono_ref, spectrum_ph, xx, 'spline');
+                cc = polyfit(xx,yy,1);
+        
+                % Display evaluated equation y = m*x + b
+                %disp(['Equation is y = ' num2str(c(1)) '*x + ' num2str(c(2))])
+        
+                edge_jump_raw = cc(2) + cc(1) * mono_ref;
+                plot(mono_ref, edge_jump_raw, 'red');
+                scatter(start_energy, edge_jump_raw(start_point), 'red', 'filled')
+                scatter(end_energy, edge_jump_raw(end_point), 'red', 'filled')
+
+                spectrum_norm = spectrum_bkg ./ (edge_jump_raw - bkg);
+
+                error = 0;
+
+            else
+                disp(' ')
+                disp('   !!! No proper edge-jump energy is given. Only do background subtraction.')
+                disp(' ')
+            end
+        end
+
+        % ---- correct for the glitch using Si(111) and Fe Ka and Kb
+        function [spectrum_norm, error] = do_glitch_correction()
+            error = 1;
+            % take out the Kb reflection
+            e1 = 7154; %7156;
+            e2 = 7162; %7162;
+            [~, pos1] = min(abs(mono_ref-e1));
+            [~, pos2] = min(abs(mono_ref-e2));
+            % interpolate data with linear curve
+            Kb_crystal_intensity = interp1([mono_ref(pos1), mono_ref(pos2)], [spectrum_norm(pos1), spectrum_norm(pos2)], mono_ref(pos1:pos2));
+            spectrum_norm(pos1:pos2) = Kb_crystal_intensity;
+            error = 0;
+        end
+
+
+        % ---- the function that gets called from the main program
+        function [spectrum_norm, error] = normalize(norm, mono_ref, spectrum_ph, run_str, scan_str, arg)
+            error = 1; 
+            spectrum_norm = spectrum_ph;
+            [spectrum_bkg, bkg, error] = data_xas.do_background(norm, mono_ref, spectrum_ph, run_str, scan_str, arg);
+            if error == 0
+                [spectrum_norm, error] = data_xas.do_normalization(norm, mono_ref, spectrum_ph, spectrum_bkg, bkg);
+            else
+                spectrum_norm = spectrum_bkg;
+            end
+
+            % Si(111) Fe Ka and Kb glitch correction:
+            if norm.correct_for_glitch == true
+                [spectrum_norm, error] = do_glitch_correction(mono_ref, spectrum_norm);
+            end
+        end        
+
+
+        % -----------------------------------------------------------------
+        % -----------------------------------------------------------------
+        % ---- the XAS data processing ------------------------------------
+        % -----------------------------------------------------------------
+
+        function [mono_ref,spectrum_norm,spectrum_ph,i0_save,i1_save,i2_save] = xas(homeDir, saveDir, arg, calib_mono, norm)
+            % check if directory exists:
+            if ~isfolder(homeDir)
+                disp('   !!! Folder does not exist!')
+                disp(['   ' homeDir])
+            end
+            cd(homeDir);
+        
+            % check if a specfile from all the 7-3 etc. shall be created
+            if arg.create_specfile == 1
+                disp(['*** Create a spec file from all ' arg.file ' data!'])
+                data_xas_to_spec.create_spec_file(homeDir, arg.file, arg.exclude, arg.beamline, arg.counter, arg)
+        
+            % go through all the data::
+            else
+                % for BL 9-3 and 7-3:
+                %   make lists of runs and scans that are used. This includes for
+                %   example run x1, scans 1-5 and run x2, scan 1
+                if any(strcmp(arg.beamline,arg.XAS_BLs))
+                    % go through all scans:
+                    XAS_BLs_scanlist = {};
+                    for i = 1:length(arg.runs)
+                        for j = 1:length(arg.scans)
+                            run = sprintf('%03d',arg.runs(i));
+                            scan = sprintf('%03d',arg.scans(j));
+                            file = [homeDir arg.file '_' run '_A.' scan];
+                            % check if the file exists:
+                            if isfile(file)
+                                XAS_BLs_scanlist{end+1} = [run '.' scan];
+                            else
+                                disp(['   !!! File ' [arg.file '_' run '_A.' scan] ' does not exist in ' homeDir])
+                                disp('       Ignore this file.')
+                            end
+                        end
+                    end
+                    if length(XAS_BLs_scanlist)==0
+                        disp(' ')
+                        disp(['   !!! None of the files exist in ' homeDir])
+                        disp(' ')
+                        return                
+                    end
+                end
+        
+                % go through all scans:
+                cnt = 0;
+                run_list = [];
+                for i = 1:length(arg.runs)
+                    for j = 1:length(arg.scans)
+ 
+                        % create filename for each individual file, check if it exists, and read the data file:
+                        % 15-2
+                        if strcmp(arg.beamline,'15-2')
+                            run = sprintf('%03d',arg.runs(i));
+                            file = [homeDir arg.file '_dir/' arg.file '_' run '.dat'];
+                            % check if file exists
+                            if ~isfile(file)
+                                disp(['   !!! File ' arg.file ' does not exist in ' homeDir])
+                                disp(' ')
+                                return
+                            else
+                                % unspec the specfile (format: specfile_xxx.dat)
+                                unspec(arg.file, homeDir);      % automatically changes into the specfile_dir directory
+                            end                        
+                            % read data and columns
+                            [data,column] = data_read.read_15_2(file,arg.counter,'absev', arg);
+
+                            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+                            % check if Sz is at a certain position:
+%                             motor_name = 'Sz';
+%                             motor_value = [15.0];
+% 
+%                             [motor_pos,motor_found] = data_read.get_motor_position(motor_name, file);
+%                             skip = false;
+%                             for ii = 1:length(motor_value)
+%                                 if abs(motor_pos - motor_value(ii))<0.01 && motor_found == true
+%                                     disp(['exclude run ' num2str(run) ', motor ' motor_name ', value: ' num2str(motor_value(ii))])
+%                                     skip = true;
+%                                 end
+%                             end
+%                             if skip == true
+%                                 break
+%                             end
+                            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+                        % 7-3, 9-3
+                        elseif any(strcmp(arg.beamline,arg.XAS_BLs))
+                            run = sprintf('%03d',arg.runs(i));
+                            scan = sprintf('%03d',arg.scans(j));
+                            if any(strcmp([run '.' scan],XAS_BLs_scanlist))
+                                file = [homeDir arg.file '_' run '_A.' scan];
+                                [data,column]  = data_read.read_XAS_BLs(file, arg.counter, arg);
+                                % sum the selected channels for the XAS beam lines:
+                                % exclude channels:
+                                if length(arg.exclude) > 0 && length(column.FF) > 0
+                                    column.FF(arg.exclude) = [];
+                                end
+                            else
+                                break
+                            end
+                        end
+        
+                        % Check that the data counter was found:
+                        if size(column.FF) == 0
+                            disp(' ')
+                            disp(['   !!! Counter ''' arg.counter ''' not found in data file!'])
+                            disp(' ')
+                            return
+                        end
+
+                        cnt = cnt + 1;
+                        run_list = [run_list arg.runs(i)];
+                        % initialize the summed data and energy axis
+                        if cnt == 1
+                            i0_sum = zeros(length(data(:,column.I0)),1);
+                            i1_sum = zeros(length(data(:,column.I0)),1);
+                            i2_sum = zeros(length(data(:,column.I0)),1);
+                            FF_sum = zeros(length(data(:,column.I0)),1);
+                            x_low = 0; 
+                            x_high = 99999;
+                            
+                        end
+                
+                        % shift energy and define reference energy axis.
+                        mono = data(:,column.mono);
+                        % check which edge is measured:
+                        raw_spec = data_read.correct_one_values(data(:,column.FF))./data_read.correct_one_values(data(:,column.I0));
+                        [edge,calib_mono,norm] = ...
+                            data_read.XAS_edge(mono, calib_mono, norm, raw_spec, cnt);
+                        if strcmp(edge,'unknown')
+                            calib_mono.calibrate_mono_method = 'none';
+
+                        end
+                        % XAS calibration:
+                        shift = 0;
+                        if strcmp(calib_mono.calibrate_mono_method,'none') == 0
+                            calib_mono.cnt = cnt;
+                            [shift, reference_energy_tabulated, calibrate_mono] = ...
+                                data_calibration.XAS_calibrate(arg, data, column, calib_mono, cnt);
+                        else
+                            if cnt == 1
+                                disp('!!! No mono calibration method set (''none''). Continue without energy calibration.')
+                                calibrate_mono = 0;
+                                shift = 0;
+                            end
+                        end
+                        mono = mono + shift;    
+            
+                        if cnt == 1
+                            mono_ref = mono;
+                        end
+                        
+                        x_low  = max([x_low, mono(1)]);
+                        x_high = min([x_high, mono(end)]);
+            
+                        FF = interp1(mono, data_read.correct_one_values(data(:,column.FF)),mono_ref, 'pchip'); % alternative: spline
+                        i0 = interp1(mono, data_read.correct_one_values(data(:,column.I0)),mono_ref, 'pchip');
+                        i1 = interp1(mono, data_read.correct_one_values(data(:,column.I1)),mono_ref, 'pchip');
+                        i2 = interp1(mono, data_read.correct_one_values(data(:,column.I2)),mono_ref, 'pchip');
+                        
+                        i0_sum = i0_sum + i0;
+                        i1_sum = i1_sum + i1;
+                        i2_sum = i2_sum + i2;
+                        FF_sum = FF_sum + FF;
+                    end 
+
+                end
+
+                if exist('FF_sum','var') == 0   % FF_sum does not exist, i.e. no data was read
+                    disp('   !!! No data!')
+                    disp(' ')
+                else
+                    
+                    % create a string for the run numbers:
+                    run_str = data_save.create_run_string(run_list);
+                    scan_str = data_save.create_scan_string(arg.scans);
+
+                    % get the spectrum in actual number of photons
+                    spectrum_ph = FF_sum ./ i0_sum * mean(i0_sum);
+
+                    % assign values to the normalized spectrum
+                    spectrum_norm = spectrum_ph;
+
+                    % normalize the data:
+                    error = 0;
+                    if norm.normalize == true
+                        %   ->  the spectrum, background and post-edge fir in plotted in this
+                        %       function.
+                        if arg.pre_edge == 0
+                            [spectrum_norm, error] = data_xas.normalize(norm, mono_ref, spectrum_ph, run_str, scan_str, arg);
+                
+                            if error == 0
+                                % plot the nbormalized spectrum
+                                figure()
+                                plot(mono_ref, spectrum_norm)
+                                box on
+                                if any(strcmp(arg.beamline,arg.XAS_BLs))
+                                    title({['file: ' arg.file], ['runs: ' run_str ', scans: ' scan_str]}, 'Interpreter','none')
+                                else
+                                    title({['file: ' arg.file], ['runs: ' run_str]}, 'Interpreter','none')
+                                end
+                            end
+                        end
+
+                    % plot unnormalized data
+                    else
+                        if error == 0
+                            % plot the nbormalized spectrum
+                            figure()
+                            plot(mono_ref, spectrum_ph)
+                            box on
+                            if any(strcmp(arg.beamline,arg.XAS_BLs))
+                                title({['file: ' arg.file], ['runs: ' run_str ', scans: ' scan_str]}, 'Interpreter','none')
+                            else
+                                title({['file: ' arg.file], ['runs: ' run_str]}, 'Interpreter','none')
+                            end
+                        end
+                        
+                    end
+            
+                    % save the data:
+                    i0_save = i0_sum / length(arg.runs);
+                    i1_save = i1_sum / length(arg.runs);
+                    i2_save = i2_sum / length(arg.runs);
+
+                    if arg.save > 0
+                        p.calibrate_mono = calibrate_mono;
+                        p.scan_type = 'energy';
+                        p.runs = run_str; %arg.runs;
+                        p.scans = arg.scans;
+                        p.beamline = arg.beamline;
+                        p.saveDir = saveDir; 
+                        p.file = arg.file;
+                        p.XAS_BLs = arg.XAS_BLs;
+                        p.run_str = run_str;
+                
+                        header = {'# Mono calibration: ',calib_mono.calibrate_mono_method,'   reference energy: ',reference_energy_tabulated,'',''};
+                        if norm.normalize == true
+                            titles = {'energy','spectrum_norm','spectrum_ph','i0','i1','i2'};
+                            mydata = [mono_ref spectrum_norm spectrum_ph i0_save i1_save i2_save];
+                        else
+                            titles = {'energy','spectrum_ph','i0','i1','i2'};
+                            mydata = [mono_ref spectrum_ph i0_save i1_save i2_save];
+                        end
+                        p.data_cell = [header; titles; num2cell(mydata)];
+                
+                        data_save.save(p);
+                    end
+                end
+            
+            end
+            cd(homeDir)
+        end
+
+
+    end
+end
