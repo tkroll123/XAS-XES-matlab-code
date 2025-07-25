@@ -38,3 +38,8 @@ Stanford Synchrotron Radiation Lightsource (SSRL)
    - xes: If no other argument is given besides the folder, filename, detector and runs, the spectrum is processed without an emission energy calibration. I am working on an easy fit with reference spectra, but not done yet.
    - pump_probe: If no other argument is given besides the folder, filename and runs, the spectrum is processed without an indident energy calibration, no background or edge-jump processing, and no t0 shift. If these are desired, the keywords 'pre-edge', 'norm', or 't0' are required. 'norm' is not yet included and also 'pre-edge' needs be be included. Note that the background is determined from the average of laser on and off shots so that the same background is subtracted from both so that the difference after background subtraction remains meaningfull. The same is true for the edge-jump normalization.
    - '2D' is not done yet 
+
+
+
+### ===== Version 1.1 =====
+2025-07-24
