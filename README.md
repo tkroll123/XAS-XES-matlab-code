@@ -43,3 +43,19 @@ Stanford Synchrotron Radiation Lightsource (SSRL)
 
 ### ===== Version 1.1 =====
 2025-07-24
+
+- various small changes and bug fixes.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
