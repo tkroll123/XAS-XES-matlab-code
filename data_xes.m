@@ -13,7 +13,7 @@ classdef data_xes
             cd(homeDir)
         
             % unspec the file, just in case.
-            unspec(arg.file, homeDir);      % automatically changes into the file_dir directory
+            data_unspec.unspec(arg.file, homeDir);      % automatically changes into the file_dir directory
         
             run_list = [];
             cnt = 1;
@@ -28,26 +28,23 @@ classdef data_xes
                 end
 
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-                % check if Sz is at a certain position:
-                motor_name = 'Sz';
-                motor_value = [19.9,20.22];
-
-                [motor_pos,motor_found] = data_read.get_motor_position(motor_name, file);
-                skip = false;
-                for ii = 1:length(motor_value)
-                    if abs(motor_pos - motor_value(ii))<0.01 && motor_found == true
-                        disp(['exclude run ' num2str(run) ', motor ' motor_name ', value: ' num2str(motor_value(ii))])
-                        break
-                        %skip = true;
+                % print the sample position:
+                if isfield(arg, 'print_sample_position')
+                    if arg.print_sample_position == true
+                        data_read.print_motor_positions(arg.runs(i), file)
                     end
                 end
-                %if skip == true
-                %    break
-                %end
 
-                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                % exclude runs if it is at a certain position:
+                skip_run = false;
+                if (isfield(arg, 'exclude_Sx') || isfield(arg, 'exclude_Sy') || isfield(arg, 'exclude_Sz'))
+                    skip_run = data_read.exclude_runs(arg, arg.runs(i), file);
+                end
+                if skip_run == true
+                    break
+                end
+
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 
         
@@ -118,7 +115,7 @@ classdef data_xes
             plot(emiss_calib, spectrum_ph)
             hold on
             xlabel('Emission energy  (eV)')
-            ylabel('Intensity  (arb. units)')
+            ylabel('Intensity  (#photons)')
             title({['file: ' arg.file], ['runs: ' run_str]}, 'Interpreter','none')
 
             % subtract background and normalize spectrum

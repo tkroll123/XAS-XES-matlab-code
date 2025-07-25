@@ -13,7 +13,7 @@ function xas(varargin)
     calib_mono.calibrate_mono_method = 'fip';
     
     %%% define if the calibration shall be plotted
-    calib_mono.plot = 'plot';       % select 'plot' or something else
+    calib_mono.plot = 'plot no';       % select 'plot' or something else
 
     % constant shift:
     calib_mono.rigid_shift =            -0.86;
@@ -26,8 +26,8 @@ function xas(varargin)
 
     % method to smooth the data to get better first derivative:
     calib_mono.fip_smooth_data =                    true;   % options: true and false, switches it on and off
-    calib_mono.fip_smooth_method =                  'Savitzky-Golay';  % options: gaussian, movmean, Savitzky-Golay
-    calib_mono.fip_smooth_window =                  5;          % for gaussian and movmean
+    calib_mono.fip_smooth_method =                  'gaussian';  % options: gaussian, movmean, Savitzky-Golay
+    calib_mono.fip_smooth_window =                  7;          % for gaussian and movmean
     calib_mono.fip_smooth_SG_order =                6;
     calib_mono.fip_smooth_SG_frame_length =         15;
 
@@ -38,9 +38,9 @@ function xas(varargin)
     calib_mono.fip_values.Co =                      7708.9;
     calib_mono.fip_values.Ni =                      8332.8;
     calib_mono.fip_values.Cu =                      8980.3;%8978.9;  % Leah: 8980.3 eV
+    calib_mono.fip_values.Zn =                      9658.6;
 
     %%% glitch:
-
     %%% energies for the I0 glitches:
     calib_mono.glitch_values.Cr =                   5991.9;
     calib_mono.glitch_values.Mn =                   6539.0;
@@ -49,6 +49,7 @@ function xas(varargin)
     calib_mono.glitch_values.Ni =                   [];
     calib_mono.glitch_values.Cu =                   8985.0;  % 15-2 value
      %calib_mono.glitch_values.Cu =                   8987.7;  % 6-2 value
+    calib_mono.glitch_values.Zn =                   [];
 
     %%% using the whole foil spectrum. Maybe included later.
     %calib_mono.calibrate_mono_foil_reference  =     ["xas_calib_Fe_foil.mat", "asdf"];
@@ -62,14 +63,16 @@ function xas(varargin)
     % subtract a constant background:
     norm.bkg_constant =                             true;   % ( options: true, false)
 
-    % energy up to where the data shall be fit:
+    % energy up to where the data shall be fit for background:
     norm.bkg_treshold_energy.Cr =                   5987.7;
     norm.bkg_treshold_energy.Mn =                   6536.0;
     norm.bkg_treshold_energy.Fe =                   7050;
     norm.bkg_treshold_energy.Co =                   7701;
     norm.bkg_treshold_energy.Ni =                   0;
     norm.bkg_treshold_energy.Cu =                   8974.2;
+    norm.bkg_treshold_energy.Zn =                   8974.2;
     norm.bkg_treshold_energy.Se =                   12649.0;
+    norm.bkg_treshold_energy.GdL3 =                 7228.0;
 
     % energy range used for the background below norm.bkg_treshold_energy
     norm.bkg_delta_energy =                         -100;
@@ -82,6 +85,7 @@ function xas(varargin)
     norm.edge_jump_start.Ni =                       0;
     norm.edge_jump_start.Cu =                       9180.0;
     norm.edge_jump_start.Se =                       12713.0;
+    norm.edge_jump_start.GdL3 =                     7350.0;
 
     % energy range used for the edge jump above norm.edge_jump_start
     norm.edge_jump_delta_energy =                   0;
@@ -89,6 +93,7 @@ function xas(varargin)
     %%% correct for Kb signal in Ka HERFD
     norm.correct_for_glitch = false;
     
+
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%% Standard channels for reference foil data:
 
@@ -110,6 +115,26 @@ function xas(varargin)
     end
     
 
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%% option to print various motor values and/or select/exclude files
+    %%% based on these values:
+
+    % print the sample position:
+    arg.print_sample_position = false;
+
+    % exclude those runs that appear at the given sample position:
+    %   to unselect motor set value lower than -9999 or delete/comment out
+    %   that line.
+    %   for two or more values, write them as an array.
+    %arg.exclude_Sx = [];
+    %arg.exclude_Sy = [];
+    %arg.exclude_Sz = [33.0, 33.3];
+
+
+    
+    
+    
+    
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

@@ -22,6 +22,8 @@ classdef data_xas
             else
                 title({['file: ' arg.file], ['runs: ' run_str]}, 'Interpreter','none')
             end
+            xlabel('Incident energy  (eV)')
+            ylabel('Intensity  (#photons)')
 
             % check if a proper background normalization is given, if
             % not, abort the normalization
@@ -148,6 +150,7 @@ classdef data_xas
             if ~isfolder(homeDir)
                 disp('   !!! Folder does not exist!')
                 disp(['   ' homeDir])
+                return
             end
             cd(homeDir);
         
@@ -197,37 +200,42 @@ classdef data_xas
                         if strcmp(arg.beamline,'15-2')
                             run = sprintf('%03d',arg.runs(i));
                             file = [homeDir arg.file '_dir/' arg.file '_' run '.dat'];
+                            my_specfile = [homeDir arg.file];
                             % check if file exists
-                            if ~isfile(file)
-                                disp(['   !!! File ' arg.file ' does not exist in ' homeDir])
+                            if ~isfile(my_specfile)
+                                disp(['   !!! Spec File ' arg.file ' does not exist in ' homeDir])
                                 disp(' ')
                                 return
                             else
-                                % unspec the specfile (format: specfile_xxx.dat)
-                                unspec(arg.file, homeDir);      % automatically changes into the specfile_dir directory
+                                % check if the data file exists, otherwise
+                                % unspec the file:
+                                if ~isfile(file)
+                                    % unspec the specfile (format: specfile_xxx.dat)
+                                    disp('am I unspec the file?')
+                                    data_unspec.unspec(arg.file, homeDir);      % automatically changes into the specfile_dir directory
+                                end
                             end                        
                             % read data and columns
                             [data,column] = data_read.read_15_2(file,arg.counter,'absev', arg);
 
                             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-                            % check if Sz is at a certain position:
-%                             motor_name = 'Sz';
-%                             motor_value = [15.0];
-% 
-%                             [motor_pos,motor_found] = data_read.get_motor_position(motor_name, file);
-%                             skip = false;
-%                             for ii = 1:length(motor_value)
-%                                 if abs(motor_pos - motor_value(ii))<0.01 && motor_found == true
-%                                     disp(['exclude run ' num2str(run) ', motor ' motor_name ', value: ' num2str(motor_value(ii))])
-%                                     skip = true;
-%                                 end
-%                             end
-%                             if skip == true
-%                                 break
-%                             end
-                            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                            % print the sample position:
+                            if isfield(arg, 'print_sample_position')
+                                if arg.print_sample_position == true
+                                    data_read.print_motor_positions(arg.runs(i), file)
+                                end
+                            end
+
+                            % exclude runs if it is at a certain position:
+                            skip_run = false;
+                            if (isfield(arg, 'exclude_Sx') || isfield(arg, 'exclude_Sy') || isfield(arg, 'exclude_Sz'))
+                                skip_run = data_read.exclude_runs(arg, arg.runs(i), file);
+                            end
+                            if skip_run == true
+                                break
+                            end
+
                             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -279,6 +287,7 @@ classdef data_xas
                             calib_mono.calibrate_mono_method = 'none';
 
                         end
+
                         % XAS calibration:
                         shift = 0;
                         if strcmp(calib_mono.calibrate_mono_method,'none') == 0
@@ -287,9 +296,10 @@ classdef data_xas
                                 data_calibration.XAS_calibrate(arg, data, column, calib_mono, cnt);
                         else
                             if cnt == 1
-                                disp('!!! No mono calibration method set (''none''). Continue without energy calibration.')
+                                fprintf(' !!! No mono calibration method set (''none''). Continue without energy calibration. \n')
                                 calibrate_mono = 0;
                                 shift = 0;
+                                reference_energy_tabulated = 0;
                             end
                         end
                         mono = mono + shift;    
@@ -381,7 +391,7 @@ classdef data_xas
                         p.file = arg.file;
                         p.XAS_BLs = arg.XAS_BLs;
                         p.run_str = run_str;
-                
+
                         header = {'# Mono calibration: ',calib_mono.calibrate_mono_method,'   reference energy: ',reference_energy_tabulated,'',''};
                         if norm.normalize == true
                             titles = {'energy','spectrum_norm','spectrum_ph','i0','i1','i2'};

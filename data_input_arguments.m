@@ -70,6 +70,8 @@ classdef data_input_arguments
 
         end
 
+
+        
         % ------------------
         function [y,error] = norm()
             error = 0;
@@ -239,6 +241,31 @@ classdef data_input_arguments
         end   % t0
 
         % ------------------
+        function [y,error] = concentration_scans(argin)
+            error = 0;
+            index = find(strcmp(argin,'conc'));
+            % (i) check if it is the last element:
+            if index == length(argin)-1
+                y=[];
+                error = 0;
+                disp(' !!! ''conc'' cannot be the last argument, it needs to be followed by a list of Sz scans.')
+                disp(' !!! Continue without concentration correction.')
+            else
+                % check if the next element is a character
+                if ischar(argin(index+1))
+                    y=[];
+                    error = 0;
+                    disp(' !!! conc needs to be followed by a list of Sz scans.')
+                    disp(' !!! Continue without concentration correction.')
+                % the next element must be the value for exclude
+                else
+                    y=cell2mat(argin(index+1));
+                end
+            end
+        end   % concentration_scans
+        
+
+        % ------------------
         function [arg] = read(varargin, ref)
 
             %argin = varargin{1};  % I don't understand why I need to do that.
@@ -264,6 +291,7 @@ classdef data_input_arguments
                 data_input_arguments.print_input_options(argin)
             end
 
+            % -------------------------------------------------------------
             % all good, let's do it!
             if arg.error == 0
                 if strcmp(argin{end},'XAS Rowland') == 1
@@ -278,6 +306,7 @@ classdef data_input_arguments
                     end
                     arg.beamline = argin{1};
                     % mandatory input arguments in specific order:
+                    % beam line
                     % directory
                     % filename
                     % counter
@@ -289,12 +318,31 @@ classdef data_input_arguments
 
                 elseif strcmp(argin{end},'XES Rowland') == 1
                     % mandatory input arguments in specific order:
+                    % beam line --> not needed. If given, delete it.
                     % directory
                     % filename
                     % counter
                     % runs
 
-                    % if the first argument is a beam line, and delete it
+                    % if the first argument is a beam line, delete it
+                    if strcmp(argin{1},'15-2') == 0 || ~any(strcmp(argin{1}, XAS_BLs))
+                        argin(1)=[];
+                    end
+
+                    arg.dir  = char(argin(1));
+                    arg.file = char(argin(2));
+                    arg.counter  = char(argin(3));
+                    arg.runs     = cell2mat(argin(4));
+
+                elseif strcmp(argin{end},'RIXS Rowland') == 1
+                    % mandatory input arguments in specific order:
+                    % beam line --> not needed. If given, delete it.
+                    % directory
+                    % filename
+                    % counter
+                    % runs
+
+                    % if the first argument is a beam line, delete it
                     if strcmp(argin{1},'15-2') == 0 || ~any(strcmp(argin{1}, XAS_BLs))
                         argin(1)=[];
                     end
@@ -353,16 +401,18 @@ classdef data_input_arguments
                 if any(strcmp(argin,'norm'))
                     [arg.norm, arg.error] = data_input_arguments.norm();
                 end
-                % check for 'ref' keyword
-                if strcmp(arg.beamline, '15-2')
-                    arg.ref = ref.ref_15_2;
-                    arg.ref_standard = ref.ref_15_2;
-                elseif strcmp(arg.beamline, '7-3')
-                    arg.ref = ref.ref_7_3;
-                    arg.ref_standard = ref.ref_15_2;
-                elseif strcmp(arg.beamline, '9-3')
-                    arg.ref = ref.ref_9_3;
-                    arg.ref_standard = ref.ref_15_2;
+                % check for 'ref' keyword, but only for XAS
+                if length(strfind(argin{end},'XAS'))==1
+                    if strcmp(arg.beamline, '15-2')
+                        arg.ref = ref.ref_15_2;
+                        arg.ref_standard = ref.ref_15_2;
+                    elseif strcmp(arg.beamline, '7-3')
+                        arg.ref = ref.ref_7_3;
+                        arg.ref_standard = ref.ref_15_2;
+                    elseif strcmp(arg.beamline, '9-3')
+                        arg.ref = ref.ref_9_3;
+                        arg.ref_standard = ref.ref_15_2;
+                    end
                 end
                 if any(strcmp(argin,'ref'))
                     [arg.ref, arg.error] = data_input_arguments.ref(argin, options);
@@ -377,6 +427,19 @@ classdef data_input_arguments
                 if any(strcmp(argin,'2D'))
                     [arg.twoDmap, arg.error] = data_input_arguments.twoDmap();
                 end
+
+                % RIXS specific keywords:
+                if strcmp(argin{end},'RIXS Rowland')
+                    
+                    % check for concentration scans:
+                    arg.conc = [];
+                    if any(strcmp(argin,'conc'))
+                        [arg.conc, arg.error] = data_input_arguments.concentration_scans(argin);
+                    end
+
+                end
+
+
             end
 
         end
