@@ -52,6 +52,54 @@ classdef data_save
         end
 
         % ---------------------------
+        function [y] = save_rixs(p, mono, emiss_en, RIXS_plane, method)
+            y = 0;
+
+            % check if folder average exists and create if not
+            if ~exist(p.saveDir, 'dir')
+                mkdir(p.saveDir);
+            end
+
+            cd(p.saveDir);
+
+            % BL 15-2: RIXS
+            runStr = p.run_str; %data_save.create_run_string(p.runs);
+            if p.calibrate_rixs == 0
+                savefile_Str = [p.file '__' p.counter  '_' runStr '_' method '_uncalibrated.dat'];
+            else
+                savefile_Str = [p.file '__' p.counter  '_' runStr '_' method '.dat'];
+            end
+
+            fname = [pwd '/' savefile_Str];
+            fid=fopen(fname,'w');
+            fprintf(fid, p.header1);
+            fprintf(fid, p.header2);
+            fprintf(fid, '# data \n');
+            if strcmp(method,'EE')
+                fprintf(fid, p.data_names_EE);
+            elseif strcmp(method,'ET')
+                fprintf(fid, p.data_names_ET);
+            end
+            
+            size(RIXS_plane)
+            size(mono)
+            size(emiss_en)
+
+            for i=1:length(mono)
+                for j=1:length(emiss_en)
+                    fprintf(fid, '%f\t%f\t%f\t%f\n', mono(i), emiss_en(j), RIXS_plane(j,i), RIXS_plane(j,i));
+                end
+                fprintf(fid, '\n');
+            end
+            fclose(fid);
+
+            disp(['save dir  = ', pwd])
+            disp(['save file = ', savefile_Str])
+            
+
+        end
+
+        % ---------------------------
         function [y] = save(p)
             y = 0;
 
@@ -64,11 +112,11 @@ classdef data_save
 
             % BL 15-2: XAS
             if strcmp(p.scan_type, 'energy') && strcmp(p.beamline, '15-2')
-                runStr = data_save.create_run_string(p.runs);
+                %runStr = data_save.create_run_string(p.runs);
                 if p.calibrate_mono == 0
-                    savefile_Str = [p.file '__xas_' runStr '_not_aligned.dat'];
+                    savefile_Str = [p.file '__xas_' p.run_str '_not_aligned.dat'];
                 else
-                    savefile_Str = [p.file '__xas_' runStr '.dat'];
+                    savefile_Str = [p.file '__xas_' p.run_str '.dat'];
                 end
 
             % BL 7-3, 9-3: XAS

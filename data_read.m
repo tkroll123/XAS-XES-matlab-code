@@ -43,9 +43,63 @@ classdef data_read
                 disp(' ')
             end
         end
+
+
+        % ---- print motor positions ------------------------------------
+        function print_motor_positions(run, file)
+            [motor_pos_Sx,motor_found_Sx] = data_read.get_motor_position('Sx', file);
+            [motor_pos_Sy,motor_found_Sy] = data_read.get_motor_position('Sy', file);
+            [motor_pos_Sz,motor_found_Sz] = data_read.get_motor_position('Sz', file);
+            if motor_found_Sx + motor_found_Sy + motor_found_Sz == 3
+                fprintf(' *** run: %d,  sample position: Sx %0.3f  Sy %0.3f  Sz %0.3f \n', run, motor_pos_Sx,motor_pos_Sy,motor_pos_Sz)
+            else
+                fprintf(' !!! Minimum one of the motors not found: Sx %d, Sy %d, Sz %d \n', motor_found_Sx, motor_found_Sx, motor_found_Sx)
+            end
+        end
         
         
-        
+        % ---- exclude scans ------------------------------------
+        function skip_run = exclude_runs(arg, run, file)
+            % exclude runs at a certain position:
+            if isfield(arg, 'exclude_Sx') && length(arg.exclude_Sx) > 0
+                [Sx_pos,Sx_found] = data_read.get_motor_position('Sx', file);
+            else
+                arg.exclude_Sx = -9999;
+                Sx_pos = -9999;
+                Sx_found = false;
+            end
+            if isfield(arg, 'exclude_Sy') && length(arg.exclude_Sy) > 0
+                [Sy_pos,Sy_found] = data_read.get_motor_position('Sy', file);
+            else
+                arg.exclude_Sy = -9999;
+                Sy_pos = -9999;
+                Sy_found = false;
+            end
+            if isfield(arg, 'exclude_Sz') && length(arg.exclude_Sz) > 0
+                [Sz_pos,Sz_found] = data_read.get_motor_position('Sz', file);
+            else
+                arg.exclude_Sz = -9999;
+                Sz_pos = -9999;
+                Sz_found = false;
+            end
+            skip_run = false;
+
+            for xx = 1:length(arg.exclude_Sx)
+                for yy = 1:length(arg.exclude_Sy)
+                    for zz = 1:length(arg.exclude_Sz)
+                        if (abs(Sx_pos - arg.exclude_Sx(xx))<0.01 && Sx_found == true) || ...
+                                (abs(Sy_pos - arg.exclude_Sy(yy))<0.01 && Sy_found == true) || ...
+                                (abs(Sz_pos - arg.exclude_Sz(zz))<0.01 && Sz_found == true)
+                            fprintf(' *** run: %d,  sample position to exclude: Sx %0.3f Sy %0.3f Sz %0.3f \n',run, arg.exclude_Sx(xx), arg.exclude_Sy(yy), arg.exclude_Sz(zz))
+                            skip_run = true;
+                        end
+                    end
+                end
+            end
+
+        end
+
+
         % ---- correct for values of 1 ------------------------------------
         function vector_corr = correct_one_values(vector)
             
@@ -54,6 +108,7 @@ classdef data_read
 
             m = size(vector,1);
             vector_corr = vector;
+
             if vector(1) == 1
                 vector_corr(1) = vector(2);
             end
@@ -72,7 +127,6 @@ classdef data_read
         % ---- get length of header ---------------------------------------
         function [skip_lines, counter_str] = get_header_length_spec(fname)
             skip_lines = 0;
-            
             if isfile(fname)
                 counter_str = '';
                 fid=fopen(fname,'r');
@@ -95,7 +149,7 @@ classdef data_read
         function index = find_counter_column(counter_str, counter)
             % split discards the space characters and returns the result as a string array.
             counter_list = split(counter_str);
-            
+
             % get the index of the required counter in the list
             ind = find(ismember(counter_list, counter));
             if ind > 0
@@ -214,7 +268,7 @@ classdef data_read
         % ---- read 15-2 --------------------------------------------------
         function [data,column] = read_15_2(file,counter,mono_str, arg)
             
-            % read the sec file:
+            % read the spec file:
             [skip_lines, counter_str] = data_read.get_header_length_spec(file);
             data = readmatrix(file, 'Delimiter',' ', 'NumHeaderLines', skip_lines, 'FileType','text', 'ConsecutiveDelimitersRule', 'join');
             
@@ -283,18 +337,24 @@ classdef data_read
                      'CeL1',6548.8;
                      'CeL2',6164.2;
                      'CeL3',5723.4;
+                     'GdL1',8365.6;
+                     'GdL2',7930.3;
+                     'GdL3',7242.8;
                      };
 
             % run through all possible edges and check if one or more fit
             possible_edges = {};
             % find first inflection point:
-            spectrum_diff = diff(spectrum);
+            % first smooth the spectrum to eliminate some noise points that
+            % could lead to errors
+            spectrum_diff = diff(smoothdata(spectrum,'gaussian',5));
             [~,loc] = max(spectrum_diff);
-%             figure()
-%             plot(mono,spectrum)
-%             title('HERE')
-%             hold on
-%             scatter(mono(loc), spectrum(loc), 'red', 'filled')
+
+            %figure()
+            %plot(mono,spectrum)
+            %title('HERE')
+            %hold on
+            %scatter(mono(loc), spectrum(loc), 'red', 'filled')
 
             for i = 1:size(edges,1)
                 if mono(loc) > edges{i,2}-50 && mono(loc) < edges{i,2}+50
